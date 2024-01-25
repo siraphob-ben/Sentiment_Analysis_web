@@ -3,7 +3,6 @@ import './App.css';
 
 function App() {
 
-  const [userInput, setUserInput] = useState<string>("")
   const [emotion, setEmotion] = useState<string>("")
 
   async function query(data: string) {
@@ -29,15 +28,16 @@ function App() {
     const target = e.target as typeof e.target & {
       TypeSomething: { value: string };
     };
-  const TypeSomething = target.TypeSomething.value
-    const huggingfaceResponse = await query(TypeSomething);
-    console.log(huggingfaceResponse);
+    const userInput = target.TypeSomething.value;
+    const huggingfaceResponse = await query(userInput);
+    if (!huggingfaceResponse.error) {console.log(huggingfaceResponse);
     const emo = huggingfaceResponse[0][0].label;
     console.log(emo);
     setEmotion(emo);
-    console.log(emotion);
+    console.log(emotion);}
   }
 
+  
 
   return (
     <div className="App">
