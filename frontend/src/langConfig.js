@@ -7,13 +7,18 @@ i18n.use(initReactI18next).init({
     en: {
       translation: {
         InoutPH: "Type something...",
-        submitBtn: "THAT'S ALL"
+        submitBtn: "THAT'S ALL",
+        introText1: "Hey!",
+        introText2: "What's up?",
+        
       }
     },
     th: {
       translation: {
         InoutPH: "พิมพ์อะไรสักอย่างสิ...",
-        submitBtn: "เรียบร้อยแล้ว"
+        submitBtn: "เรียบร้อยแล้ว",
+        introText1: "หวัดดี!",
+        introText2: "สบายดีไหม?",
       }
     },
   },

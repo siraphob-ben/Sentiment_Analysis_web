@@ -1,21 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import './App.css';
-import { Translation, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import i18n from './langConfig';
+import { message } from 'antd';
 
 
 function App() {
 
+  const [messageApi, contextHolder] = message.useMessage();
+
   const [emotion, setEmotion] = useState<string>("neutral")
   const [translatedText, setTranslatedText] = useState("");
   const [isThChecked, setIsThChecked] = useState(false);
-  
+
 
   const { t } = useTranslation();
 
   type EmotionColorMap = Record<string, string[]>;
 
- 
+
   const emotionColorMap: EmotionColorMap = {
     admiration: ['#ffd700', '#b4e148', '#6de181', '#19dab2', '#00ced1'], // Gold, Dark Turquoise
     amusement: ['#ff69b4', '#ff708e', '#ff8a63', '#ffb035', '#ffd700'], // Hot Pink, Gold
@@ -49,23 +52,27 @@ function App() {
   const [bgColor, setBgColor] = useState<string[]>([]);
 
   async function query(data: string) {
-    try {
-      const response = await fetch(
-        "https://api-inference.huggingface.co/models/SamLowe/roberta-base-go_emotions",
-        {
-          headers: { Authorization: `Bearer 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` },
-          method: "POST",
-          body: JSON.stringify(data),
-        }
-      );
+    const response = await fetch(
+      "https://api-inference.huggingface.co/models/SamLowe/roberta-base-go_emotions",
+      {
+        headers: { Authorization: `Bearer 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` },
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
+    if (response.status) {
       const result = await response.json();
       return result;
     }
-    catch (error) {
-      console.log("error");
-      console.log(error);
-
+    else {
+      console.log("HuggingFaceresponse");
+      console.log(response);
+      messageApi.open({
+        type: 'error',
+        content: 'Something went wrong',
+      });
     }
+
   }
 
   const getEmotion = async (input: string) => {
@@ -79,8 +86,8 @@ function App() {
   }
 
   const translate = (input: string) => {
-    try{
-      const from = 'th-TH';
+
+    const from = 'th-TH';
     const to = 'en-GB';
 
     let apiURL = `https://api.mymemory.translated.net/get?q=${input}&langpair=${from}|${to}`
@@ -89,13 +96,6 @@ function App() {
       console.log(data);
       setTranslatedText(data.responseData.translatedText);
     })
-    }
-    catch(error){
-      console.log("error");
-      console.log(error);
-    }
-    
-
   }
 
   const HandleOnSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -116,12 +116,20 @@ function App() {
   }
 
   useEffect(() => { getEmotion(translatedText); }, [translatedText]);
-  useEffect(() => { setBgColor(emotionColorMap[emotion]);}, [emotion]);
+  useEffect(() => { setBgColor(emotionColorMap[emotion]); }, [emotion]);
+
+
+  const [showIntro, setShowIntro] = useState(true);
 
   useEffect(() => {
     i18n.changeLanguage("en");
     getEmotion("");
     console.log(bgColor);
+
+    setTimeout(() => {
+      setShowIntro(false);
+    }, 15000)
+
   }, [])
 
   const HandleOnChange = () => {
@@ -129,10 +137,15 @@ function App() {
     if (isThChecked) i18n.changeLanguage("en");
     else i18n.changeLanguage("th");
   }
-  
+
   return (
-    <div className="App">
-      <div style={{backgroundImage:`linear-gradient(to right top, ${bgColor[0]}, ${bgColor[1]}, ${bgColor[2]}, ${bgColor[3]}, ${bgColor[4]}`}} className='gap-40  flex justify-center items-center h-screen flex-col'>
+    <div className="App" style={{ backgroundColor: '#292929' }}>
+      {showIntro && <div className=' absolute top-1/3 left-1/2 transform -translate-x-1/2  w-[500px] flex justify-center'>
+        <span className=' absolute text-8xl text-[#ebebeb] animate-flip-down animate-once animate-reverse animate-delay-[2000ms]'>{t("introText1")}</span>
+        <span className=' absolute text-8xl text-[#ebebeb] animate-flip-up animate-once animate-delay-[3500ms]'>{t("introText2")}</span>
+      </div>}
+      <div style={{ backgroundImage: `linear-gradient(to right top, ${bgColor[0]}, ${bgColor[1]}, ${bgColor[2]}, ${bgColor[3]}, ${bgColor[4]}` }} className=' animate-fade animate-duration-[3000ms] animate-delay-[7000ms] gap-40  flex justify-center items-center h-screen flex-col'>
+        {contextHolder}
         <div className='absolute top-10 right-14 '>
           <label className='themeSwitcherThree relative inline-flex cursor-pointer select-none items-center'>
             <input
