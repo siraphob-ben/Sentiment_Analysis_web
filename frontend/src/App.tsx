@@ -9,20 +9,21 @@ function App() {
 
   const [messageApi, contextHolder] = message.useMessage();
 
-  const [emotion, setEmotion] = useState<string>("neutral")
+  const [emotion, setEmotion] = useState<string>("neutral");
+  const [keywords, setKeywords] = useState<string[]>([]);
   const [translatedText, setTranslatedText] = useState("");
   const [isThChecked, setIsThChecked] = useState(false);
+  const [isKeywordChanged, setIsKeywordChanged] = useState(false);
 
 
   const { t } = useTranslation();
 
   type EmotionColorMap = Record<string, string[]>;
 
-
   const emotionColorMap: EmotionColorMap = {
     admiration: ['#ffd700', '#b4e148', '#6de181', '#19dab2', '#00ced1'], // Gold, Dark Turquoise
     amusement: ['#ff69b4', '#ff708e', '#ff8a63', '#ffb035', '#ffd700'], // Hot Pink, Gold
-    anger: ['#ff0000', '#e50001', '#cb0001', '#b20001', '#990000'], // Red, Dark Red
+    anger: ['#ad0000', '#c12004', '#d6350b', '#ea4712', '#ff5919'], // Red, Dark Red
     annoyance: ['#ffff00', '#ffd000', '#ff9f00', '#ff6700', '#ff0000'], // Tomato, Orange Red
     approval: ['#008000', '#10930e', '#1da61b', '#28b927', '#32cd32'], // Green, Lime Green
     caring: ['#ffc0cb', '#ffacc1', '#ff96ba', '#ff80b6', '#ff69b4'], // Pink, Hot Pink
@@ -51,7 +52,36 @@ function App() {
   };
   const [bgColor, setBgColor] = useState<string[]>([]);
 
-  async function query(data: string) {
+  async function queryKeyword(data: { inputs: string; }) {
+    const response = await fetch(
+      "https://api-inference.huggingface.co/models/transformer3/H2-keywordextractor",
+      {
+        headers: { Authorization: "Bearer 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" },
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
+    const result = await response.json();
+    return result;
+  }
+
+  const getKeywords = async (inputs: string) => {
+    if (inputs !== '') {
+      let keywordRes = await queryKeyword({ "inputs": inputs });
+      if (!keywordRes.error) {
+        console.log(keywordRes);
+        if (inputs !== 'load_modelK') setKeywords(keywordRes[0].summary_text.split(', '));
+      }
+      else {
+        console.log(keywordRes.error);
+      }
+    }
+
+  }
+
+  useEffect(() => { console.log(keywords); setIsKeywordChanged(true)}, [keywords]);
+
+  async function queryEmotion(data: string) {
     const response = await fetch(
       "https://api-inference.huggingface.co/models/SamLowe/roberta-base-go_emotions",
       {
@@ -60,28 +90,25 @@ function App() {
         body: JSON.stringify(data),
       }
     );
-    if (response.status) {
-      const result = await response.json();
-      return result;
-    }
-    else {
-      console.log("HuggingFaceresponse");
-      console.log(response);
-      messageApi.open({
-        type: 'error',
-        content: 'Something went wrong',
-      });
-    }
+    const result = await response.json();
+    return result;
 
   }
 
   const getEmotion = async (input: string) => {
 
-    const huggingfaceResponse = await query(input);
+    const huggingfaceResponse = await queryEmotion(input);
     if (!huggingfaceResponse.error) {
       console.log(huggingfaceResponse);
       const emo = huggingfaceResponse[0][0].label;
-      setEmotion(emo);
+      if (input !== 'load_modelE') setEmotion(emo);
+    }
+    else {
+      console.log(huggingfaceResponse.error);
+      messageApi.open({
+        type: 'error',
+        content: 'Something went wrong',
+      });
     }
   }
 
@@ -105,17 +132,20 @@ function App() {
     };
     const userInput = (target.TypeSomething.value);
 
+    setIsKeywordChanged(false);
+
     if (userInput) {
       if (isThChecked) {
         translate(userInput);
       }
       else if (!isThChecked) {
         getEmotion(userInput);
+        getKeywords(userInput);
       }
     }
   }
 
-  useEffect(() => { getEmotion(translatedText); }, [translatedText]);
+  useEffect(() => { getEmotion(translatedText); getKeywords(translatedText); }, [translatedText]);
   useEffect(() => { setBgColor(emotionColorMap[emotion]); }, [emotion]);
 
 
@@ -123,7 +153,8 @@ function App() {
 
   useEffect(() => {
     i18n.changeLanguage("en");
-    getEmotion("");
+    getEmotion("load_modelE");
+    getKeywords("load_modelK");
     console.log(bgColor);
 
     setTimeout(() => {
@@ -144,7 +175,7 @@ function App() {
         <span className=' absolute text-8xl text-[#ebebeb] animate-flip-down animate-once animate-reverse animate-delay-[2000ms]'>{t("introText1")}</span>
         <span className=' absolute text-8xl text-[#ebebeb] animate-flip-up animate-once animate-delay-[3500ms]'>{t("introText2")}</span>
       </div>}
-      <div style={{ backgroundImage: `linear-gradient(to right top, ${bgColor[0]}, ${bgColor[1]}, ${bgColor[2]}, ${bgColor[3]}, ${bgColor[4]}` }} className=' animate-fade animate-duration-[3000ms] animate-delay-[7000ms] gap-40  flex justify-center items-center h-screen flex-col'>
+      <div style={{ backgroundImage: `linear-gradient(to right top, ${bgColor[0]}, ${bgColor[1]}, ${bgColor[2]}, ${bgColor[3]}, ${bgColor[4]}` }} className=' animate-fade animate-duration-[3000ms] animate-delay-[7000ms] gap-36  flex justify-center items-center h-screen flex-col'>
         {contextHolder}
         <div className='absolute top-10 right-14 '>
           <label className='themeSwitcherThree relative inline-flex cursor-pointer select-none items-center'>
@@ -203,7 +234,18 @@ function App() {
               className=" bg-transparent before:content[' '] after:content[' '] pointer-events-none absolute left-0 -top-1.5  hidden h-full w-full select-none !overflow-visible truncate text-[11px] font-normal leading-tight text-gray-500 transition-all before:pointer-events-none before:mt-[6.5px] before:mr-1 before:box-border before:block before:h-1.5 before:w-2.5 before:rounded-tl-md before:border-t before:border-l before:border-blue-gray-200 before:transition-all after:pointer-events-none after:mt-[6.5px] after:ml-1 after:box-border after:block after:h-1.5 after:w-2.5 after:flex-grow after:rounded-tr-md after:border-t after:border-r after:border-blue-gray-200 after:transition-all peer-placeholder-shown:text-sm peer-placeholder-shown:leading-[3.75] peer-placeholder-shown:text-blue-gray-500 peer-placeholder-shown:before:border-transparent peer-placeholder-shown:after:border-transparent peer-focus:text-[11px] peer-focus:leading-tight peer-focus:text-gray-900 peer-focus:before:border-t-2 peer-focus:before:border-l-2 peer-focus:before:!border-gray-900 peer-focus:after:border-t-2 peer-focus:after:border-r-2 peer-focus:after:!border-gray-900 peer-disabled:text-transparent peer-disabled:before:border-transparent peer-disabled:after:border-transparent peer-disabled:peer-placeholder-shown:text-blue-gray-500"></label>
           </div>
         </div>
-        {/* <button onClick={translate}>Test</button> */}
+        {/* <button onClick={test}>Test</button> */}
+        {isKeywordChanged && <div className='absolute top-3/4 text-center'>
+          <div className='animate-jump-in animate-once animate-delay-[500ms] animate-ease-in-out '>{keywords[0]}</div>
+          <div className='animate-jump-in animate-once animate-delay-[1000ms] animate-ease-in-out'>{keywords[1]}</div>
+          <div className='animate-jump-in animate-once animate-delay-[1500ms] animate-ease-in-out'>{keywords[2]}</div>
+          <div className='animate-jump-in animate-once animate-delay-[2000ms] animate-ease-in-out'>{keywords[3]}</div>
+          <div className='animate-jump-in animate-once animate-delay-[2500ms] animate-ease-in-out'>{keywords[4]}</div>
+          {/* {keywords.map((keyword, index) => (
+            <div className={`animate-jump-in animate-once animate-delay-[${index}000ms] animate-ease-in-out`}>{keyword} {index}</div>
+          ))} */}
+        </div>}
+
       </div>
 
     </div>
