@@ -2,13 +2,33 @@ import React, { useEffect, useState } from 'react';
 import './App.css';
 import { useTranslation } from 'react-i18next';
 import i18n from './langConfig';
-import { message } from 'antd';
+import { Button, message } from 'antd';
 
+import {Vdos} from "./video"
+import { max } from '@xenova/transformers';
+
+const HG_API_KEY = "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";
+const YT_API_KEY = "AIzaSyDTgsIJSdBo43ydmf28S1PFTw6lhXe-_Zk";
 
 function App() {
 
+  type EmotionColorMap = Record<string, string[]>;
+  interface ytVDO {
+    id: {videoId: string};
+    snippet: {title: string, thumbnails: {medium: {url: string}}};
+  }
+
+  interface EmoWithScore {
+    label: string;
+    score: Float32Array[];
+  }
+  
+
   const [messageApi, contextHolder] = message.useMessage();
 
+  const [ytVDOs, setYtVDOs] = useState<ytVDO[]>();
+  const [ytVDOs2, setYtVDOs2] = useState<ytVDO[]>();
+  const [emoRec, setEmoRec] = useState<EmoWithScore[]>();
   const [emotion, setEmotion] = useState<string>("neutral");
   const [keywords, setKeywords] = useState<string[]>([]);
   const [translatedText, setTranslatedText] = useState("");
@@ -18,7 +38,7 @@ function App() {
 
   const { t } = useTranslation();
 
-  type EmotionColorMap = Record<string, string[]>;
+
 
   const emotionColorMap: EmotionColorMap = {
     admiration: ['#ffd700', '#b4e148', '#6de181', '#19dab2', '#00ced1'], // Gold, Dark Turquoise
@@ -56,7 +76,7 @@ function App() {
     const response = await fetch(
       "https://api-inference.huggingface.co/models/transformer3/H2-keywordextractor",
       {
-        headers: { Authorization: "Bearer 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" },
+        headers: { Authorization: `Bearer ${HG_API_KEY}` },
         method: "POST",
         body: JSON.stringify(data),
       }
@@ -85,7 +105,7 @@ function App() {
     const response = await fetch(
       "https://api-inference.huggingface.co/models/SamLowe/roberta-base-go_emotions",
       {
-        headers: { Authorization: `Bearer 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` },
+        headers: { Authorization: `Bearer ${HG_API_KEY}` },
         method: "POST",
         body: JSON.stringify(data),
       }
@@ -100,6 +120,7 @@ function App() {
     const huggingfaceResponse = await queryEmotion(input);
     if (!huggingfaceResponse.error) {
       console.log(huggingfaceResponse);
+      setEmoRec(huggingfaceResponse[0]);
       const emo = huggingfaceResponse[0][0].label;
       if (input !== 'load_modelE') setEmotion(emo);
     }
@@ -152,10 +173,10 @@ function App() {
   const [showIntro, setShowIntro] = useState(true);
 
   useEffect(() => {
+    
     i18n.changeLanguage("en");
     getEmotion("load_modelE");
     getKeywords("load_modelK");
-    console.log(bgColor);
 
     setTimeout(() => {
       setShowIntro(false);
@@ -169,13 +190,36 @@ function App() {
     else i18n.changeLanguage("th");
   }
 
+  const YtSearch = async () => {
+    const keyword = keywords[0] + "," + (keywords[1] ? keywords[1] + "," : "") + (keywords[2] ? keywords[2] + "," : "") + (keywords[3] ? keywords[3] + "," : "") + (keywords[4] ? keywords[4] + "," : "") + (keywords[5] ? keywords[5] + "," : "") + "podcast";
+    console.log(keyword); 
+
+    const aipURL = `https://youtube.googleapis.com/youtube/v3/search?key=${YT_API_KEY}&part=snippet&q=${keyword}&maxResults=5&type=video`;
+
+    fetch(aipURL, {headers: { Accept: "application/json"}}).then((res) => res.json()).then((resJ) => {
+      console.log(resJ);
+      console.log(resJ.items);
+      setYtVDOs(resJ.items);
+      
+    })
+  }
+
+  const getYtById = async (id:string[]) => {
+    const aipURL = `https://youtube.googleapis.com/youtube/v3/videos?key=${YT_API_KEY}&part=snippet&id=${id}`;
+    fetch(aipURL, {headers: { Accept: "application/json"}}).then((res) => res.json()).then((resJ) => {
+      console.log(resJ);
+      console.log(resJ.items);
+      setYtVDOs2(resJ.items);
+    })
+  }
+
   return (
     <div className="App" style={{ backgroundColor: '#292929' }}>
       {showIntro && <div className=' absolute top-1/3 left-1/2 transform -translate-x-1/2  w-[500px] flex justify-center'>
         <span className=' absolute text-8xl text-[#ebebeb] animate-flip-down animate-once animate-reverse animate-delay-[2000ms]'>{t("introText1")}</span>
         <span className=' absolute text-8xl text-[#ebebeb] animate-flip-up animate-once animate-delay-[3500ms]'>{t("introText2")}</span>
       </div>}
-      <div style={{ backgroundImage: `linear-gradient(to right top, ${bgColor[0]}, ${bgColor[1]}, ${bgColor[2]}, ${bgColor[3]}, ${bgColor[4]}` }} className=' animate-fade animate-duration-[3000ms] animate-delay-[7000ms] gap-36  flex justify-center items-center h-screen flex-col'>
+      <div style={{ backgroundImage: `linear-gradient(to right top, ${bgColor[0]}, ${bgColor[1]}, ${bgColor[2]}, ${bgColor[3]}, ${bgColor[4]}` }} className=' animate-fade animate-duration-[3000ms] animate-delay-[7000ms] gap-28  flex justify-center items-center h-screen flex-col'>
         {contextHolder}
         <div className='absolute top-10 right-14 '>
           <label className='themeSwitcherThree relative inline-flex cursor-pointer select-none items-center'>
@@ -203,9 +247,13 @@ function App() {
           </label>
         </div>
 
-        <div>
-          <h1 className=' font-serif text-6xl'>{emotion}</h1>
-        </div>
+        {emoRec&&<div className=' text-center'>
+          <h1 className=' font-serif text-6xl'>{emoRec[0].label} </h1>
+          <h1 className= 'font-serif text-4xl'>{emoRec[1].label}</h1>
+          <h1 className=' font-serif text-3xl'>{emoRec[2].label}</h1>
+          <h1 className=' font-serif text-2xl'>{emoRec[3].label}</h1>
+          <h1 className=' font-serif text-1xl'>{emoRec[4].label}</h1>
+        </div>}
         <div className='bg-black p-10 rounded-lg bg-opacity-20'>
           <div className="relative h-full w-full min-w-[200px] ">
             <form onSubmit={HandleOnSubmit}>
@@ -234,19 +282,31 @@ function App() {
               className=" bg-transparent before:content[' '] after:content[' '] pointer-events-none absolute left-0 -top-1.5  hidden h-full w-full select-none !overflow-visible truncate text-[11px] font-normal leading-tight text-gray-500 transition-all before:pointer-events-none before:mt-[6.5px] before:mr-1 before:box-border before:block before:h-1.5 before:w-2.5 before:rounded-tl-md before:border-t before:border-l before:border-blue-gray-200 before:transition-all after:pointer-events-none after:mt-[6.5px] after:ml-1 after:box-border after:block after:h-1.5 after:w-2.5 after:flex-grow after:rounded-tr-md after:border-t after:border-r after:border-blue-gray-200 after:transition-all peer-placeholder-shown:text-sm peer-placeholder-shown:leading-[3.75] peer-placeholder-shown:text-blue-gray-500 peer-placeholder-shown:before:border-transparent peer-placeholder-shown:after:border-transparent peer-focus:text-[11px] peer-focus:leading-tight peer-focus:text-gray-900 peer-focus:before:border-t-2 peer-focus:before:border-l-2 peer-focus:before:!border-gray-900 peer-focus:after:border-t-2 peer-focus:after:border-r-2 peer-focus:after:!border-gray-900 peer-disabled:text-transparent peer-disabled:before:border-transparent peer-disabled:after:border-transparent peer-disabled:peer-placeholder-shown:text-blue-gray-500"></label>
           </div>
         </div>
-        {/* <button onClick={test}>Test</button> */}
-        {isKeywordChanged && <div className='absolute top-3/4 text-center'>
-          <div className='animate-jump-in animate-once animate-delay-[500ms] animate-ease-in-out '>{keywords[0]}</div>
-          <div className='animate-jump-in animate-once animate-delay-[1000ms] animate-ease-in-out'>{keywords[1]}</div>
-          <div className='animate-jump-in animate-once animate-delay-[1500ms] animate-ease-in-out'>{keywords[2]}</div>
-          <div className='animate-jump-in animate-once animate-delay-[2000ms] animate-ease-in-out'>{keywords[3]}</div>
-          <div className='animate-jump-in animate-once animate-delay-[2500ms] animate-ease-in-out'>{keywords[4]}</div>
-          {/* {keywords.map((keyword, index) => (
-            <div className={`animate-jump-in animate-once animate-delay-[${index}000ms] animate-ease-in-out`}>{keyword} {index}</div>
-          ))} */}
-        </div>}
+        <div>
+        <Button onClick={YtSearch}>Reccomment by keywords</Button>
+        <Button onClick={() => getYtById((Vdos as any)[emotion])}>Reccomment by my constant</Button>
+        
+        </div>
 
+      <div className='absolute left-10 bottom-10 h-[600px] overflow-y-scroll ' style={{ scrollbarWidth: 'none',}}>
+        {ytVDOs?.map((vdo) => (
+          <div className=' text-white flex flex-col items-center justify-center h-[250px] w-[300px] bg-black bg-opacity-50 gap-2 m-5 rounded-md shadow-xl'>
+          <img src={vdo.snippet.thumbnails.medium.url} width={"250px"} className=' rounded-md'/>
+          <h1 className=' text-center m-2'>{vdo.snippet.title}</h1>
+        </div>
+        ))}
       </div>
+
+      <div className='absolute right-10 bottom-10 h-[600px] overflow-y-scroll' style={{ scrollbarWidth: 'none',}}>
+        {ytVDOs2?.map((vdo) => (
+          <div className=' text-white flex flex-col items-center justify-center h-[250px] w-[300px] bg-black bg-opacity-50 gap-2 m-5 rounded-md shadow-xl'>
+          <img src={vdo.snippet.thumbnails.medium.url} width={"250px"} className=' rounded-md'/>
+          <h1 className=' text-center m-2'>{vdo.snippet.title}</h1>
+        </div>
+        ))}
+      </div>
+      </div>
+      
 
     </div>
   );
